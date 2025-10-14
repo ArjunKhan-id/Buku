@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Barcode Buku</title>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 900px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .app-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .scanner-section, .data-section {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .scanner-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #scanner-view {
+            width: 100%;
+            height: 300px;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .scan-line {
+            position: absolute;
+            height: 3px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent, #4a90e2, transparent);
+            animation: scan 2s linear infinite;
+            box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+
+        .scanner-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(to right, #4a90e2, #63b3ed);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: linear-gradient(to right, #3a7bc8, #4a90e2);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(to right, #6c757d, #868e96);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(to right, #5a6268, #6c757d);
+        }
+
+        .btn-success {
+            background: linear-gradient(to right, #28a745, #20c997);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(to right, #218838, #1e7e34);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            border-color: #4a90e2;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+        }
+
+        .result {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+            display: none;
+        }
+
+        .result h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+
+        .result-item {
+            margin-bottom: 12px;
+            display: flex;
+        }
+
+        .result-label {
+            font-weight: 600;
+            min-width: 120px;
+            color: #555;
+        }
+
+        .result-value {
+            color: #333;
+            flex: 1;
+        }
+
+        .valid {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .invalid {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-btn {
+            padding: 5px 10px;
+            font-size: 12px;
+            width: auto;
+        }
+
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #4a90e2;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 25px;
+            text-align: left;
+        }
+
+        .info-box h4 {
+            color: #2c5282;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .barcode-example {
+            font-family: 'Libre Barcode 128', monospace;
+            font-size: 36px;
+            margin: 15px 0;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .status-scanning {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-idle {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .scanner-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Scanner Barcode Buku</h1>
+        <p class="subtitle">Scan kode barcode buku dengan kamera HP dan kelola kepemilikan</p>
+        
+        <div class="app-container">
+            <div class="scanner-section">
+                <div class="scanner-container">
+                    <div id="scanner-view"></div>
+                    <div class="scanner-overlay">
+                        <div class="scan-line"></div>
+                    </div>
+                </div>
+                
+                <div id="scanner-status" class="status status-idle">
+                    Scanner siap - Klik "Mulai Scan" untuk memulai
+                </div>
+                
+                <div class="scanner-controls">
+                    <button id="start-scan-btn">Mulai Scan</button>
+                    <button id="stop-scan-btn" class="btn-secondary">Stop Scan</button>
+                </div>
+                
+                <div class="input-group">
+                    <label for="barcode">Kode Barcode (ISBN):</label>
+                    <input type="text" id="barcode" placeholder="Kode akan terisi otomatis saat scan">
+                </div>
+                
+                <div class="input-group">
+                    <label for="book-title">Judul Buku:</label>
+                    <input type="text" id="book-title" placeholder="Masukkan judul buku">
+                </div>
+                
+                <div class="input-group">
+                    <label for="book-owner">Pemilik Buku:</label>
+                    <select id="book-owner">
+                        <option value="">Pilih Pemilik</option>
+                        <option value="Arjun">Arjun</option>
+                        <option value="Budi">Budi</option>
+                        <option value="Citra">Citra</option>
+                        <option value="Dewi">Dewi</option>
+                        <option value="Eko">Eko</option>
+                        <option value="Fajar">Fajar</option>
+                        <option value="Gita">Gita</option>
+                        <option value="Hadi">Hadi</option>
+                        <option value="Indah">Indah</option>
+                        <option value="Joko">Joko</option>
+                    </select>
+                </div>
+                
+                <button id="save-btn" class="btn-success">Simpan Data Buku</button>
+                
+                <div class="result" id="result">
+                    <h3>Hasil Pemeriksaan</h3>
+                    <div class="result-item">
+                        <span class="result-label">Kode Barcode:</span>
+                        <span class="result-value" id="result-code"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Judul Buku:</span>
+                        <span class="result-value" id="result-title"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Pemilik:</span>
+                        <span class="result-value" id="result-owner"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Status:</span>
+                        <span class="result-value" id="result-status"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Tanggal Input:</span>
+                        <span class="result-value" id="result-date"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="data-section">
+                <h3>Daftar Buku Terdaftar</h3>
+                <table id="book-table">
+                    <thead>
+                        <tr>
+                            <th>Kode Buku</th>
+                            <th>Judul</th>
+                            <th>Pemilik</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="book-list">
+                        <!-- Data buku akan dimasukkan di sini oleh JavaScript -->
+                    </tbody>
+                </table>
+                
+                <div class="info-box">
+                    <h4>Cara Menggunakan Scanner:</h4>
+                    <ol>
+                        <li>Klik "Mulai Scan" dan izinkan akses kamera</li>
+                        <li>Arahkan kamera ke barcode buku</li>
+                        <li>Tunggu hingga kode terdeteksi otomatis</li>
+                        <li>Isi judul buku dan pilih pemilik</li>
+                        <li>Klik "Simpan Data Buku"</li>
+                    </ol>
+                    <p>Contoh format barcode buku (ISBN):</p>
+                    <div class="barcode-example">9783161484100</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data buku contoh
+        const sampleBooks = [
+            { code: "9783161484100", title: "Pemrograman JavaScript Modern", owner: "Arjun" },
+            { code: "9780439708180", title: "Harry Potter and the Sorcerer's Stone", owner: "Budi" },
+            { code: "9780141439518", title: "Pride and Prejudice", owner: "Citra" },
+            { code: "9780451524935", title: "1984", owner: "Dewi" },
+            { code: "9780061120084", title: "To Kill a Mockingbird", owner: "Eko" }
+        ];
+
+        // Inisialisasi data buku dari localStorage atau gunakan data contoh
+        let books = JSON.parse(localStorage.getItem('bookData')) || sampleBooks;
+        let isScanning = false;
+
+        // Simpan data buku ke localStorage
+        function saveBooks() {
+            localStorage.setItem('bookData', JSON.stringify(books));
+        }
+
+        // Tampilkan data buku di tabel
+        function displayBooks() {
+            const bookList = document.getElementById('book-list');
+            bookList.innerHTML = '';
+            
+            books.forEach((book, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${book.code}</td>
+                    <td>${book.title}</td>
+                    <td>${book.owner}</td>
+                    <td class="actions">
+                        <button class="action-btn" onclick="viewBook(${index})">Lihat</button>
+                        <button class="action-btn btn-secondary" onclick="deleteBook(${index})">Hapus</button>
+                    </td>
+                `;
+                bookList.appendChild(row);
+            });
+        }
+
+        // Tampilkan detail buku
+        function viewBook(index) {
+            const book = books[index];
+            document.getElementById('barcode').value = book.code;
+            document.getElementById('book-title').value = book.title;
+            document.getElementById('book-owner').value = book.owner;
+            
+            showResult(true, 'Data buku ditemukan', book);
+        }
+
+        // Hapus buku
+        function deleteBook(index) {
+            if (confirm(`Apakah Anda yakin ingin menghapus buku "${books[index].title}"?`)) {
+                books.splice(index, 1);
+                saveBooks();
+                displayBooks();
+                alert('Buku berhasil dihapus!');
+            }
+        }
+
+        // Validasi ISBN
+        function validateISBN(isbn) {
+            // Hapus karakter non-digit
+            const cleanISBN = isbn.replace(/-/g, '');
+            
+            // Validasi ISBN-10
+            if (cleanISBN.length === 10) {
+                let sum = 0;
+                for (let i = 0; i < 9; i++) {
+                    const digit = parseInt(cleanISBN[i]);
+                    if (isNaN(digit)) return false;
+                    sum += (digit * (10 - i));
+                }
+                
+                const lastChar = cleanISBN[9];
+                if (lastChar === 'X') {
+                    sum += 10;
+                } else {
+                    const digit = parseInt(lastChar);
+                    if (isNaN(digit)) return false;
+                    sum += digit;
+                }
+                
+                return (sum % 11 === 0);
+            }
+            
+            // Validasi ISBN-13
+            if (cleanISBN.length === 13) {
+                let sum = 0;
+                for (let i = 0; i < 12; i++) {
+                    const digit = parseInt(cleanISBN[i]);
+                    if (isNaN(digit)) return false;
+                    sum += (digit * (i % 2 === 0 ? 1 : 3));
+                }
+                
+                const checkDigit = parseInt(cleanISBN[12]);
+                if (isNaN(checkDigit)) return false;
+                
+                return (10 - (sum % 10)) % 10 === checkDigit;
+            }
+            
+            return false;
+        }
+
+        // Tampilkan hasil
+        function showResult(isValid, message, bookInfo = null) {
+            const resultDiv = document.getElementById('result');
+            const resultCode = document.getElementById('result-code');
+            const resultTitle = document.getElementById('result-title');
+            const resultOwner = document.getElementById('result-owner');
+            const resultStatus = document.getElementById('result-status');
+            const resultDate = document.getElementById('result-date');
+            
+            if (isValid && bookInfo) {
+                resultCode.textContent = bookInfo.code;
+                resultTitle.textContent = bookInfo.title;
+                resultOwner.textContent = bookInfo.owner;
+                resultStatus.innerHTML = '<span class="valid">✓ Valid - Buku Terdaftar</span>';
+                resultDate.textContent = new Date().toLocaleDateString('id-ID');
+            } else {
+                resultCode.textContent = document.getElementById('barcode').value;
+                resultTitle.textContent = document.getElementById('book-title').value || '-';
+                resultOwner.textContent = document.getElementById('book-owner').value || '-';
+                resultStatus.innerHTML = `<span class="invalid">✗ ${message}</span>`;
+                resultDate.textContent = new Date().toLocaleDateString('id-ID');
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+
+        // Inisialisasi scanner barcode
+        function initScanner() {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scanner-view'),
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment" // Gunakan kamera belakang
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_128_reader"
+                    ]
+                }
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    document.getElementById('scanner-status').textContent = 
+                        'Error: Tidak dapat mengakses kamera. Pastikan Anda memberikan izin akses kamera.';
+                    document.getElementById('scanner-status').className = 'status invalid';
+                    return;
+                }
+                console.log("Scanner siap");
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function(result) {
+                if (isScanning) {
+                    const code = result.codeResult.code;
+                    document.getElementById('barcode').value = code;
+                    document.getElementById('scanner-status').textContent = 
+                        `Barcode terdeteksi: ${code}`;
+                    document.getElementById('scanner-status').className = 'status status-scanning';
+                    
+                    // Otomatis stop scan setelah berhasil
+                    stopScanner();
+                    
+                    // Beri feedback sukses
+                    beepSuccess();
+                }
+            });
+        }
+
+        // Mulai scanner
+        function startScanner() {
+            if (!isScanning) {
+                isScanning = true;
+                document.getElementById('scanner-status').textContent = 
+                    'Scanning... Arahkan kamera ke barcode buku';
+                document.getElementById('scanner-status').className = 'status status-scanning';
+                
+                if (!Quagga.initialized) {
+                    initScanner();
+                } else {
+                    Quagga.start();
+                }
+            }
+        }
+
+        // Stop scanner
+        function stopScanner() {
+            if (isScanning) {
+                isScanning = false;
+                Quagga.stop();
+                document.getElementById('scanner-status').textContent = 
+                    'Scanner dihentikan - Klik "Mulai Scan" untuk memulai lagi';
+                document.getElementById('scanner-status').className = 'status status-idle';
+            }
+        }
+
+        // Feedback suara sukses
+        function beepSuccess() {
+            // Buat suara beep sederhana
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 800;
+            gainNode.gain.value = 0.1;
+            
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + 0.5);
+            oscillator.stop(context.currentTime + 0.5);
+        }
+
+        // Event Listeners
+        document.getElementById('start-scan-btn').addEventListener('click', startScanner);
+        document.getElementById('stop-scan-btn').addEventListener('click', stopScanner);
+
+        document.getElementById('save-btn').addEventListener('click', function() {
+            const barcodeInput = document.getElementById('barcode').value.trim();
+            const bookTitle = document.getElementById('book-title').value.trim();
+            const bookOwner = document.getElementById('book-owner').value;
+            
+            if (!barcodeInput) {
+                alert('Silakan masukkan kode barcode!');
+                return;
+            }
+            
+            if (!bookTitle) {
+                alert('Silakan masukkan judul buku!');
+                return;
+            }
+            
+            if (!bookOwner) {
+                alert('Silakan pilih pemilik buku!');
+                return;
+            }
+            
+            // Validasi ISBN
+            const isValid = validateISBN(barcodeInput);
+            
+            if (isValid) {
+                // Cek apakah buku sudah ada
+                const existingBookIndex = books.findIndex(book => book.code === barcodeInput.replace(/-/g, ''));
+                
+                if (existingBookIndex !== -1) {
+                    // Update buku yang sudah ada
+                    books[existingBookIndex].title = bookTitle;
+                    books[existingBookIndex].owner = bookOwner;
+                    showResult(true, 'Data buku diperbarui', books[existingBookIndex]);
+                } else {
+                    // Tambah buku baru
+                    const newBook = {
+                        code: barcodeInput.replace(/-/g, ''),
+                        title: bookTitle,
+                        owner: bookOwner
+                    };
+                    books.push(newBook);
+                    showResult(true, 'Buku baru ditambahkan', newBook);
+                }
+                
+                saveBooks();
+                displayBooks();
+                
+                // Reset form
+                document.getElementById('barcode').value = '';
+                document.getElementById('book-title').value = '';
+                document.getElementById('book-owner').value = '';
+            } else {
+                showResult(false, 'Kode barcode tidak valid. Pastikan format ISBN-10 atau ISBN-13 yang benar.');
+            }
+        });
+
+        // Inisialisasi tampilan
+        displayBooks();
+
+        // Stop scanner ketika hditutup
+        window.addEventListener('beforeunload', stopScanner);
+    </script>
+</body>
+  </html>
