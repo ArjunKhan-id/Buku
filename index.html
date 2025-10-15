@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Barcode Buku</title>
+    <title>Scanner Barcode Buku - Firebase</title>
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -27,7 +29,7 @@
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             width: 100%;
-            max-width: 900px;
+            max-width: 1100px;
             padding: 30px;
             margin-bottom: 20px;
         }
@@ -47,19 +49,48 @@
         }
 
         .app-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
         }
 
         .scanner-section, .data-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scan-methods {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .scan-method-btn {
             flex: 1;
-            min-width: 300px;
+            padding: 12px;
+            border: 2px solid #4a90e2;
+            background: white;
+            color: #4a90e2;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .scan-method-btn.active {
+            background: #4a90e2;
+            color: white;
         }
 
         .scanner-container {
             position: relative;
             margin-bottom: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #scanner-view {
@@ -68,6 +99,25 @@
             background-color: #000;
             border-radius: 8px;
             overflow: hidden;
+            display: none;
+        }
+
+        #image-preview {
+            max-width: 100%;
+            max-height: 300px;
+            display: none;
+        }
+
+        .upload-area {
+            text-align: center;
+            padding: 40px 20px;
+            cursor: pointer;
+        }
+
+        .upload-area i {
+            font-size: 48px;
+            color: #4a90e2;
+            margin-bottom: 15px;
         }
 
         .scanner-overlay {
@@ -77,6 +127,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            display: none;
         }
 
         .scan-line {
@@ -109,7 +160,6 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            flex: 1;
             transition: all 0.3s;
         }
 
@@ -135,6 +185,14 @@
             background: linear-gradient(to right, #218838, #1e7e34);
         }
 
+        .btn-danger {
+            background: linear-gradient(to right, #dc3545, #e35d6a);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(to right, #c82333, #dc3545);
+        }
+
         .input-group {
             margin-bottom: 15px;
         }
@@ -146,7 +204,7 @@
             color: #444;
         }
 
-        input, select {
+        input, select, textarea {
             width: 100%;
             padding: 12px 15px;
             border: 2px solid #ddd;
@@ -155,10 +213,21 @@
             transition: all 0.3s;
         }
 
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             border-color: #4a90e2;
             outline: none;
             box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
         }
 
         .result {
@@ -184,7 +253,7 @@
 
         .result-label {
             font-weight: 600;
-            min-width: 120px;
+            min-width: 140px;
             color: #555;
         }
 
@@ -219,6 +288,8 @@
             background-color: #f8f9fa;
             font-weight: 600;
             color: #333;
+            position: sticky;
+            top: 0;
         }
 
         tr:hover {
@@ -242,7 +313,6 @@
             padding: 15px;
             border-radius: 4px;
             margin-top: 25px;
-            text-align: left;
         }
 
         .info-box h4 {
@@ -254,14 +324,6 @@
             color: #4a5568;
             font-size: 14px;
             line-height: 1.5;
-        }
-
-        .barcode-example {
-            font-family: 'Libre Barcode 128', monospace;
-            font-size: 36px;
-            margin: 15px 0;
-            letter-spacing: 2px;
-            text-align: center;
         }
 
         .status {
@@ -284,6 +346,27 @@
             border: 1px solid #ffeaa7;
         }
 
+        .book-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .search-box {
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 968px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -293,71 +376,115 @@
                 font-size: 24px;
             }
             
-            .app-container {
-                flex-direction: column;
-            }
-            
             .scanner-controls {
                 flex-direction: column;
             }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <h1>Scanner Barcode Buku</h1>
-        <p class="subtitle">Scan kode barcode buku dengan kamera HP dan kelola kepemilikan</p>
+        <h1><i class="fas fa-book"></i> Sistem Manajemen Buku</h1>
+        <p class="subtitle">Scan barcode dari kamera atau gambar, simpan data ke Firebase</p>
         
         <div class="app-container">
             <div class="scanner-section">
+                <div class="scan-methods">
+                    <button class="scan-method-btn active" id="camera-btn">
+                        <i class="fas fa-camera"></i> Scan Kamera
+                    </button>
+                    <button class="scan-method-btn" id="gallery-btn">
+                        <i class="fas fa-images"></i> Upload Gambar
+                    </button>
+                </div>
+                
                 <div class="scanner-container">
                     <div id="scanner-view"></div>
+                    <div id="image-preview"></div>
+                    
+                    <div class="upload-area" id="upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Klik atau seret gambar barcode ke sini</h3>
+                        <p>Format yang didukung: JPG, PNG, GIF</p>
+                        <input type="file" id="file-input" accept="image/*" style="display: none;">
+                    </div>
+                    
                     <div class="scanner-overlay">
                         <div class="scan-line"></div>
                     </div>
                 </div>
                 
                 <div id="scanner-status" class="status status-idle">
-                    Scanner siap - Klik "Mulai Scan" untuk memulai
+                    Pilih metode scan di atas
                 </div>
                 
                 <div class="scanner-controls">
-                    <button id="start-scan-btn">Mulai Scan</button>
+                    <button id="start-scan-btn">Mulai Scan Kamera</button>
                     <button id="stop-scan-btn" class="btn-secondary">Stop Scan</button>
+                    <button id="process-image-btn" class="btn-success" style="display: none;">Proses Gambar</button>
+                </div>
+                
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="barcode"><i class="fas fa-barcode"></i> Kode Barcode:</label>
+                        <input type="text" id="barcode" placeholder="Kode akan terisi otomatis">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="book-owner"><i class="fas fa-user"></i> Pemilik:</label>
+                        <select id="book-owner">
+                            <option value="">Pilih Pemilik</option>
+                            <option value="Arjun">Arjun</option>
+                            <option value="Budi">Budi</option>
+                            <option value="Citra">Citra</option>
+                            <option value="Dewi">Dewi</option>
+                            <option value="Eko">Eko</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="input-group">
-                    <label for="barcode">Kode Barcode (ISBN):</label>
-                    <input type="text" id="barcode" placeholder="Kode akan terisi otomatis saat scan">
-                </div>
-                
-                <div class="input-group">
-                    <label for="book-title">Judul Buku:</label>
+                    <label for="book-title"><i class="fas fa-heading"></i> Judul Buku:</label>
                     <input type="text" id="book-title" placeholder="Masukkan judul buku">
                 </div>
                 
-                <div class="input-group">
-                    <label for="book-owner">Pemilik Buku:</label>
-                    <select id="book-owner">
-                        <option value="">Pilih Pemilik</option>
-                        <option value="Arjun">Arjun</option>
-                        <option value="Budi">Budi</option>
-                        <option value="Citra">Citra</option>
-                        <option value="Dewi">Dewi</option>
-                        <option value="Eko">Eko</option>
-                        <option value="Fajar">Fajar</option>
-                        <option value="Gita">Gita</option>
-                        <option value="Hadi">Hadi</option>
-                        <option value="Indah">Indah</option>
-                        <option value="Joko">Joko</option>
-                    </select>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="book-author"><i class="fas fa-user-edit"></i> Penulis:</label>
+                        <input type="text" id="book-author" placeholder="Nama penulis">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="book-year"><i class="fas fa-calendar"></i> Tahun Terbit:</label>
+                        <input type="number" id="book-year" placeholder="Tahun" min="1900" max="2030">
+                    </div>
                 </div>
                 
-                <button id="save-btn" class="btn-success">Simpan Data Buku</button>
+                <div class="form-row">
+                    <div class="input-group">
+                        <label for="input-location"><i class="fas fa-map-marker-alt"></i> Lokasi Input:</label>
+                        <input type="text" id="input-location" placeholder="Lokasi saat input">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="input-date"><i class="fas fa-clock"></i> Tanggal Input:</label>
+                        <input type="datetime-local" id="input-date">
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="book-description"><i class="fas fa-sticky-note"></i> Keterangan:</label>
+                    <textarea id="book-description" placeholder="Keterangan tambahan tentang buku"></textarea>
+                </div>
+                
+                <button id="save-btn" class="btn-success">
+                    <i class="fas fa-save"></i> Simpan ke Database
+                </button>
                 
                 <div class="result" id="result">
-                    <h3>Hasil Pemeriksaan</h3>
+                    <h3><i class="fas fa-check-circle"></i> Hasil Pemeriksaan</h3>
                     <div class="result-item">
                         <span class="result-label">Kode Barcode:</span>
                         <span class="result-value" id="result-code"></span>
@@ -371,113 +498,216 @@
                         <span class="result-value" id="result-owner"></span>
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Status:</span>
-                        <span class="result-value" id="result-status"></span>
+                        <span class="result-label">Lokasi Input:</span>
+                        <span class="result-value" id="result-location"></span>
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Tanggal Input:</span>
+                        <span class="result-label">Waktu Input:</span>
                         <span class="result-value" id="result-date"></span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Status:</span>
+                        <span class="result-value" id="result-status"></span>
                     </div>
                 </div>
             </div>
             
             <div class="data-section">
-                <h3>Daftar Buku Terdaftar</h3>
-                <table id="book-table">
-                    <thead>
-                        <tr>
-                            <th>Kode Buku</th>
-                            <th>Judul</th>
-                            <th>Pemilik</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="book-list">
-                        <!-- Data buku akan dimasukkan di sini oleh JavaScript -->
-                    </tbody>
-                </table>
+                <h3><i class="fas fa-list"></i> Daftar Buku Terdaftar</h3>
+                
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Cari berdasarkan judul, pemilik, atau kode...">
+                </div>
+                
+                <div class="book-table-container">
+                    <table id="book-table">
+                        <thead>
+                            <tr>
+                                <th>Kode</th>
+                                <th>Judul</th>
+                                <th>Pemilik</th>
+                                <th>Tanggal Input</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="book-list">
+                            <!-- Data dari Firebase akan dimuat di sini -->
+                        </tbody>
+                    </table>
+                </div>
                 
                 <div class="info-box">
-                    <h4>Cara Menggunakan Scanner:</h4>
-                    <ol>
-                        <li>Klik "Mulai Scan" dan izinkan akses kamera</li>
-                        <li>Arahkan kamera ke barcode buku</li>
-                        <li>Tunggu hingga kode terdeteksi otomatis</li>
-                        <li>Isi judul buku dan pilih pemilik</li>
-                        <li>Klik "Simpan Data Buku"</li>
-                    </ol>
-                    <p>Contoh format barcode buku (ISBN):</p>
-                    <div class="barcode-example">9783161484100</div>
+                    <h4><i class="fas fa-info-circle"></i> Informasi Sistem</h4>
+                    <p><strong>Fitur yang tersedia:</strong></p>
+                    <ul>
+                        <li>Scan barcode dari kamera langsung</li>
+                        <li>Upload gambar barcode dari galeri</li>
+                        <li>Penyimpanan data ke Firebase Cloud</li>
+                        <li>Pencarian dan filter data buku</li>
+                        <li>Detail waktu dan lokasi input</li>
+                    </ul>
+                    <p><strong>Format barcode yang didukung:</strong> ISBN, EAN-13, Code 128</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Data buku contoh
-        const sampleBooks = [
-            { code: "9783161484100", title: "Pemrograman JavaScript Modern", owner: "Arjun" },
-            { code: "9780439708180", title: "Harry Potter and the Sorcerer's Stone", owner: "Budi" },
-            { code: "9780141439518", title: "Pride and Prejudice", owner: "Citra" },
-            { code: "9780451524935", title: "1984", owner: "Dewi" },
-            { code: "9780061120084", title: "To Kill a Mockingbird", owner: "Eko" }
-        ];
+        // Konfigurasi Firebase - GANTI DENGAN KONFIGURASI ANDA
+        const firebaseConfig = {
+  apiKey: "AIzaSyDRHbVYml4hi35W9wvu0r_mhMWXgQTT1Gs",
+  authDomain: "buku-52605.firebaseapp.com",
+  databaseURL: "https://buku-52605-default-rtdb.firebaseio.com",
+  projectId: "buku-52605",
+  storageBucket: "buku-52605.firebasestorage.app",
+  messagingSenderId: "524452024333",
+  appId: "1:524452024333:web:0a0cd8fb5515821f7fc544",
+  measurementId: "G-RW3D500LDS"
+};
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-        // Inisialisasi data buku dari localStorage atau gunakan data contoh
-        let books = JSON.parse(localStorage.getItem('bookData')) || sampleBooks;
         let isScanning = false;
+        let currentScanMethod = 'camera';
+        let currentImageFile = null;
 
-        // Simpan data buku ke localStorage
-        function saveBooks() {
-            localStorage.setItem('bookData', JSON.stringify(books));
-        }
+        // Fungsi untuk mendapatkan lokasi pengguna
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject('Geolocation tidak didukung');
+                    return;
+                }
 
-        // Tampilkan data buku di tabel
-        function displayBooks() {
-            const bookList = document.getElementById('book-list');
-            bookList.innerHTML = '';
-            
-            books.forEach((book, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${book.code}</td>
-                    <td>${book.title}</td>
-                    <td>${book.owner}</td>
-                    <td class="actions">
-                        <button class="action-btn" onclick="viewBook(${index})">Lihat</button>
-                        <button class="action-btn btn-secondary" onclick="deleteBook(${index})">Hapus</button>
-                    </td>
-                `;
-                bookList.appendChild(row);
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        // Reverse geocoding sederhana (dalam implementasi nyata, gunakan service seperti Google Maps Geocoding)
+                        resolve(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        resolve('Lokasi tidak dapat ditentukan');
+                    },
+                    { timeout: 10000 }
+                );
             });
         }
 
-        // Tampilkan detail buku
-        function viewBook(index) {
-            const book = books[index];
-            document.getElementById('barcode').value = book.code;
-            document.getElementById('book-title').value = book.title;
-            document.getElementById('book-owner').value = book.owner;
+        // Set tanggal dan waktu saat ini
+        function setCurrentDateTime() {
+            const now = new Date();
+            // Format untuk input datetime-local
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
             
-            showResult(true, 'Data buku ditemukan', book);
+            document.getElementById('input-date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
         }
 
-        // Hapus buku
-        function deleteBook(index) {
-            if (confirm(`Apakah Anda yakin ingin menghapus buku "${books[index].title}"?`)) {
-                books.splice(index, 1);
-                saveBooks();
-                displayBooks();
-                alert('Buku berhasil dihapus!');
+        // Load data buku dari Firebase
+        function loadBooksFromFirebase() {
+            db.collection('books').orderBy('timestamp', 'desc').get()
+                .then((querySnapshot) => {
+                    const bookList = document.getElementById('book-list');
+                    bookList.innerHTML = '';
+                    
+                    if (querySnapshot.empty) {
+                        bookList.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada data buku</td></tr>';
+                        return;
+                    }
+                    
+                    querySnapshot.forEach((doc) => {
+                        const book = doc.data();
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${book.barcode}</td>
+                            <td>${book.title}</td>
+                            <td>${book.owner}</td>
+                            <td>${new Date(book.timestamp).toLocaleString('id-ID')}</td>
+                            <td class="actions">
+                                <button class="action-btn" onclick="viewBookDetails('${doc.id}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="action-btn btn-danger" onclick="deleteBook('${doc.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                        bookList.appendChild(row);
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error loading books:', error);
+                    alert('Error loading data from Firebase');
+                });
+        }
+
+        // View book details
+        function viewBookDetails(bookId) {
+            db.collection('books').doc(bookId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const book = doc.data();
+                        alert(`Detail Buku:\n\nJudul: ${book.title}\nPemilik: ${book.owner}\nPenulis: ${book.author || '-'}\nTahun: ${book.year || '-'}\nKode: ${book.barcode}\nLokasi: ${book.location}\nWaktu: ${new Date(book.timestamp).toLocaleString('id-ID')}\nKeterangan: ${book.description || '-'}`);
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error getting book:', error);
+                });
+        }
+
+        // Delete book
+        function deleteBook(bookId) {
+            if (confirm('Apakah Anda yakin ingin menghapus buku ini?')) {
+                db.collection('books').doc(bookId).delete()
+                    .then(() => {
+                        alert('Buku berhasil dihapus!');
+                        loadBooksFromFirebase();
+                    })
+                    .catch((error) => {
+                        console.error('Error deleting book:', error);
+                        alert('Error deleting book');
+                    });
             }
+        }
+
+        // Save book to Firebase
+        function saveBookToFirebase(bookData) {
+            db.collection('books').add(bookData)
+                .then((docRef) => {
+                    console.log('Book saved with ID:', docRef.id);
+                    alert('Buku berhasil disimpan ke database!');
+                    loadBooksFromFirebase();
+                    resetForm();
+                })
+                .catch((error) => {
+                    console.error('Error saving book:', error);
+                    alert('Error saving book to Firebase');
+                });
+        }
+
+        // Reset form
+        function resetForm() {
+            document.getElementById('barcode').value = '';
+            document.getElementById('book-title').value = '';
+            document.getElementById('book-author').value = '';
+            document.getElementById('book-year').value = '';
+            document.getElementById('book-description').value = '';
+            document.getElementById('book-owner').value = '';
+            setCurrentDateTime();
+            document.getElementById('result').style.display = 'none';
         }
 
         // Validasi ISBN
         function validateISBN(isbn) {
-            // Hapus karakter non-digit
             const cleanISBN = isbn.replace(/-/g, '');
             
-            // Validasi ISBN-10
             if (cleanISBN.length === 10) {
                 let sum = 0;
                 for (let i = 0; i < 9; i++) {
@@ -498,7 +728,6 @@
                 return (sum % 11 === 0);
             }
             
-            // Validasi ISBN-13
             if (cleanISBN.length === 13) {
                 let sum = 0;
                 for (let i = 0; i < 12; i++) {
@@ -522,21 +751,24 @@
             const resultCode = document.getElementById('result-code');
             const resultTitle = document.getElementById('result-title');
             const resultOwner = document.getElementById('result-owner');
-            const resultStatus = document.getElementById('result-status');
+            const resultLocation = document.getElementById('result-location');
             const resultDate = document.getElementById('result-date');
+            const resultStatus = document.getElementById('result-status');
             
             if (isValid && bookInfo) {
-                resultCode.textContent = bookInfo.code;
+                resultCode.textContent = bookInfo.barcode;
                 resultTitle.textContent = bookInfo.title;
                 resultOwner.textContent = bookInfo.owner;
-                resultStatus.innerHTML = '<span class="valid">✓ Valid - Buku Terdaftar</span>';
-                resultDate.textContent = new Date().toLocaleDateString('id-ID');
+                resultLocation.textContent = bookInfo.location;
+                resultDate.textContent = new Date(bookInfo.timestamp).toLocaleString('id-ID');
+                resultStatus.innerHTML = '<span class="valid">✓ Valid - Siap Disimpan</span>';
             } else {
                 resultCode.textContent = document.getElementById('barcode').value;
                 resultTitle.textContent = document.getElementById('book-title').value || '-';
                 resultOwner.textContent = document.getElementById('book-owner').value || '-';
+                resultLocation.textContent = document.getElementById('input-location').value || '-';
+                resultDate.textContent = document.getElementById('input-date').value || '-';
                 resultStatus.innerHTML = `<span class="invalid">✗ ${message}</span>`;
-                resultDate.textContent = new Date().toLocaleDateString('id-ID');
             }
             
             resultDiv.style.display = 'block';
@@ -552,25 +784,20 @@
                     constraints: {
                         width: 640,
                         height: 480,
-                        facingMode: "environment" // Gunakan kamera belakang
+                        facingMode: "environment"
                     }
                 },
                 decoder: {
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader",
-                        "code_128_reader"
-                    ]
+                    readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
                 }
             }, function(err) {
                 if (err) {
                     console.error(err);
                     document.getElementById('scanner-status').textContent = 
-                        'Error: Tidak dapat mengakses kamera. Pastikan Anda memberikan izin akses kamera.';
+                        'Error: Tidak dapat mengakses kamera';
                     document.getElementById('scanner-status').className = 'status invalid';
                     return;
                 }
-                console.log("Scanner siap");
                 Quagga.start();
             });
 
@@ -582,22 +809,163 @@
                         `Barcode terdeteksi: ${code}`;
                     document.getElementById('scanner-status').className = 'status status-scanning';
                     
-                    // Otomatis stop scan setelah berhasil
                     stopScanner();
-                    
-                    // Beri feedback sukses
                     beepSuccess();
                 }
             });
         }
 
-        // Mulai scanner
+        // Process image for barcode
+        function processImageForBarcode(imageSrc) {
+            Quagga.decodeSingle({
+                decoder: {
+                    readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
+                },
+                locate: true,
+                src: imageSrc
+            }, function(result) {
+                if (result && result.codeResult) {
+                    const code = result.codeResult.code;
+                    document.getElementById('barcode').value = code;
+                    document.getElementById('scanner-status').textContent = 
+                        `Barcode terdeteksi: ${code}`;
+                    document.getElementById('scanner-status').className = 'status status-scanning';
+                    beepSuccess();
+                } else {
+                    document.getElementById('scanner-status').textContent = 
+                        'Tidak dapat mendeteksi barcode pada gambar';
+                    document.getElementById('scanner-status').className = 'status invalid';
+                }
+            });
+        }
+
+        // Switch scan method
+        function switchScanMethod(method) {
+            currentScanMethod = method;
+            const cameraBtn = document.getElementById('camera-btn');
+            const galleryBtn = document.getElementById('gallery-btn');
+            const scannerView = document.getElementById('scanner-view');
+            const uploadArea = document.getElementById('upload-area');
+            const processBtn = document.getElementById('process-image-btn');
+            const startBtn = document.getElementById('start-scan-btn');
+            const stopBtn = document.getElementById('stop-scan-btn');
+            
+            if (method === 'camera') {
+                cameraBtn.classList.add('active');
+                galleryBtn.classList.remove('active');
+                scannerView.style.display = 'block';
+                uploadArea.style.display = 'none';
+                processBtn.style.display = 'none';
+                startBtn.style.display = 'block';
+                stopBtn.style.display = 'block';
+                document.getElementById('scanner-status').textContent = 
+                    'Klik "Mulai Scan Kamera" untuk memulai';
+            } else {
+                cameraBtn.classList.remove('active');
+                galleryBtn.classList.add('active');
+                scannerView.style.display = 'none';
+                uploadArea.style.display = 'flex';
+                processBtn.style.display = 'block';
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'none';
+                stopScanner();
+                document.getElementById('scanner-status').textContent = 
+                    'Upload gambar barcode atau seret ke area di atas';
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('camera-btn').addEventListener('click', () => switchScanMethod('camera'));
+        document.getElementById('gallery-btn').addEventListener('click', () => switchScanMethod('gallery'));
+        document.getElementById('start-scan-btn').addEventListener('click', startScanner);
+        document.getElementById('stop-scan-btn').addEventListener('click', stopScanner);
+        document.getElementById('process-image-btn').addEventListener('click', processUploadedImage);
+        document.getElementById('upload-area').addEventListener('click', () => document.getElementById('file-input').click());
+        document.getElementById('file-input').addEventListener('change', handleFileSelect);
+        document.getElementById('save-btn').addEventListener('click', saveBook);
+        document.getElementById('search-input').addEventListener('input', searchBooks);
+
+        // Drag and drop functionality
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.getElementById('upload-area').addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            document.getElementById('upload-area').addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            document.getElementById('upload-area').addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            document.getElementById('upload-area').style.backgroundColor = '#f0f8ff';
+        }
+
+        function unhighlight() {
+            document.getElementById('upload-area').style.backgroundColor = '';
+        }
+
+        document.getElementById('upload-area').addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type.match('image.*')) {
+                    displayImage(file);
+                    currentImageFile = file;
+                } else {
+                    alert('Please upload an image file');
+                }
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function displayImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imagePreview = document.getElementById('image-preview');
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                document.getElementById('upload-area').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processUploadedImage() {
+            if (currentImageFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processImageForBarcode(e.target.result);
+                };
+                reader.readAsDataURL(currentImageFile);
+            } else {
+                alert('Please select an image first');
+            }
+        }
+
         function startScanner() {
             if (!isScanning) {
                 isScanning = true;
                 document.getElementById('scanner-status').textContent = 
-                    'Scanning... Arahkan kamera ke barcode buku';
+                    'Scanning... Arahkan kamera ke barcode';
                 document.getElementById('scanner-status').className = 'status status-scanning';
+                document.querySelector('.scanner-overlay').style.display = 'block';
                 
                 if (!Quagga.initialized) {
                     initScanner();
@@ -607,20 +975,18 @@
             }
         }
 
-        // Stop scanner
         function stopScanner() {
             if (isScanning) {
                 isScanning = false;
                 Quagga.stop();
                 document.getElementById('scanner-status').textContent = 
-                    'Scanner dihentikan - Klik "Mulai Scan" untuk memulai lagi';
+                    'Scanner dihentikan';
                 document.getElementById('scanner-status').className = 'status status-idle';
+                document.querySelector('.scanner-overlay').style.display = 'none';
             }
         }
 
-        // Feedback suara sukses
         function beepSuccess() {
-            // Buat suara beep sederhana
             const context = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = context.createOscillator();
             const gainNode = context.createGain();
@@ -637,70 +1003,111 @@
             oscillator.stop(context.currentTime + 0.5);
         }
 
-        // Event Listeners
-        document.getElementById('start-scan-btn').addEventListener('click', startScanner);
-        document.getElementById('stop-scan-btn').addEventListener('click', stopScanner);
+        async function saveBook() {
+            const barcode = document.getElementById('barcode').value.trim();
+            const title = document.getElementById('book-title').value.trim();
+            const owner = document.getElementById('book-owner').value;
+            const author = document.getElementById('book-author').value.trim();
+            const year = document.getElementById('book-year').value;
+            const description = document.getElementById('book-description').value.trim();
+            const location = document.getElementById('input-location').value.trim();
+            const inputDate = document.getElementById('input-date').value;
 
-        document.getElementById('save-btn').addEventListener('click', function() {
-            const barcodeInput = document.getElementById('barcode').value.trim();
-            const bookTitle = document.getElementById('book-title').value.trim();
-            const bookOwner = document.getElementById('book-owner').value;
-            
-            if (!barcodeInput) {
+            if (!barcode) {
                 alert('Silakan masukkan kode barcode!');
                 return;
             }
-            
-            if (!bookTitle) {
+
+            if (!title) {
                 alert('Silakan masukkan judul buku!');
                 return;
             }
-            
-            if (!bookOwner) {
+
+            if (!owner) {
                 alert('Silakan pilih pemilik buku!');
                 return;
             }
-            
+
             // Validasi ISBN
-            const isValid = validateISBN(barcodeInput);
+            const isValid = validateISBN(barcode);
             
-            if (isValid) {
-                // Cek apakah buku sudah ada
-                const existingBookIndex = books.findIndex(book => book.code === barcodeInput.replace(/-/g, ''));
-                
-                if (existingBookIndex !== -1) {
-                    // Update buku yang sudah ada
-                    books[existingBookIndex].title = bookTitle;
-                    books[existingBookIndex].owner = bookOwner;
-                    showResult(true, 'Data buku diperbarui', books[existingBookIndex]);
+            if (!isValid) {
+                if (!confirm('Kode barcode tidak valid. Apakah Anda yakin ingin tetap menyimpan?')) {
+                    return;
+                }
+            }
+
+            try {
+                // Dapatkan lokasi jika belum diisi
+                let finalLocation = location;
+                if (!finalLocation) {
+                    finalLocation = await getCurrentLocation();
+                    document.getElementById('input-location').value = finalLocation;
+                }
+
+                // Tentukan timestamp
+                let timestamp;
+                if (inputDate) {
+                    timestamp = new Date(inputDate).getTime();
                 } else {
-                    // Tambah buku baru
-                    const newBook = {
-                        code: barcodeInput.replace(/-/g, ''),
-                        title: bookTitle,
-                        owner: bookOwner
-                    };
-                    books.push(newBook);
-                    showResult(true, 'Buku baru ditambahkan', newBook);
+                    timestamp = new Date().getTime();
+                    setCurrentDateTime();
+                }
+
+                const bookData = {
+                    barcode: barcode.replace(/-/g, ''),
+                    title: title,
+                    owner: owner,
+                    author: author || '',
+                    year: year || '',
+                    description: description || '',
+                    location: finalLocation,
+                    timestamp: timestamp,
+                    created: new Date().getTime()
+                };
+
+                showResult(true, '', bookData);
+                saveBookToFirebase(bookData);
+
+            } catch (error) {
+                console.error('Error saving book:', error);
+                alert('Error menyimpan buku: ' + error.message);
+            }
+        }
+
+        function searchBooks() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.getElementById('book-list').getElementsByTagName('tr');
+            
+            for (let row of rows) {
+                const cells = row.getElementsByTagName('td');
+                let found = false;
+                
+                for (let cell of cells) {
+                    if (cell.textContent.toLowerCase().includes(searchTerm)) {
+                        found = true;
+                        break;
+                    }
                 }
                 
-                saveBooks();
-                displayBooks();
-                
-                // Reset form
-                document.getElementById('barcode').value = '';
-                document.getElementById('book-title').value = '';
-                document.getElementById('book-owner').value = '';
-            } else {
-                showResult(false, 'Kode barcode tidak valid. Pastikan format ISBN-10 atau ISBN-13 yang benar.');
+                row.style.display = found ? '' : 'none';
             }
+        }
+
+        // Inisialisasi
+        document.addEventListener('DOMContentLoaded', function() {
+            setCurrentDateTime();
+            loadBooksFromFirebase();
+            switchScanMethod('camera');
+            
+            // Coba dapatkan lokasi saat ini
+            getCurrentLocation().then(location => {
+                document.getElementById('input-location').value = location;
+            });
         });
 
-        // Inisialisasi tampilan
-        displayBooks();
-
-        // Stop scanner ketika hditutup
+        // Stop scanner ketika halaman ditutup
         window.addEventListener('beforeunload', stopScanner);
     </script>
 </body>
-  </html>
+</html>
