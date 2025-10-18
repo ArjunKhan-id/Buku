@@ -437,10 +437,10 @@
                         <select id="book-owner">
                             <option value="">Pilih Pemilik</option>
                             <option value="Arjun">Arjun</option>
-                            <option value="Budi">Budi</option>
-                            <option value="Citra">Citra</option>
-                            <option value="Dewi">Dewi</option>
-                            <option value="Eko">Eko</option>
+                            <option value="Gana">Gana</option>
+                            <option value="Gaffar">Gaffar</option>
+                            <option value="Dermawan">Dermawan</option>
+                            <option value="Hisam">Hisam</option>
                         </select>
                     </div>
                 </div>
@@ -1111,3 +1111,22 @@
     </script>
 </body>
 </html>
+// ... (kode sebelumnya tetap sama)
+
+// Save book to Firebase
+function saveBookToFirebase(bookData) {
+    console.log('Attempting to save book data:', bookData);  // Tambah logging
+    db.collection('books').add(bookData)
+        .then((docRef) => {
+            console.log('Book saved successfully with ID:', docRef.id);
+            alert('Buku berhasil disimpan ke database!');
+            loadBooksFromFirebase();
+            resetForm();
+        })
+        .catch((error) => {
+            console.error('Error saving book to Firebase:', error);
+            alert('Error saving book to Firebase: ' + error.message + '. Cek console untuk detail.');
+        });
+}
+
+// ... (kode setelahnya tetap sama)
