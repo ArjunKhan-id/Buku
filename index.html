@@ -1111,22 +1111,81 @@
     </script>
 </body>
 </html>
-// ... (kode sebelumnya tetap sama)
+<!-- Ganti/masukkan bagian JavaScript berikut pada index.html Anda (fungsi viewBookDetails dan saveBook) -->
+<script>
+    // ... kode lain tetap ...
 
-// Save book to Firebase
-function saveBookToFirebase(bookData) {
-    console.log('Attempting to save book data:', bookData);  // Tambah logging
-    db.collection('books').add(bookData)
-        .then((docRef) => {
-            console.log('Book saved successfully with ID:', docRef.id);
-            alert('Buku berhasil disimpan ke database!');
-            loadBooksFromFirebase();
-            resetForm();
-        })
-        .catch((error) => {
-            console.error('Error saving book to Firebase:', error);
-            alert('Error saving book to Firebase: ' + error.message + '. Cek console untuk detail.');
-        });
-}
+    // View book details (diperbaiki)
+    function viewBookDetails(bookId) {
+        db.collection('books').doc(bookId).get()
+            .then((doc) => {
+                if (doc.exists) {
+                    const book = doc.data();
+                    alert(
+`Detail Buku:
 
-// ... (kode setelahnya tetap sama)
+Judul: ${book.title}
+Pemilik: ${book.owner}
+Penulis: ${book.author || '-'}
+Tahun: ${book.year || '-'}
+Kode: ${book.barcode}
+Lokasi: ${book.location || '-'}
+Keterangan: ${book.description || '-'}`
+                    );
+                } else {
+                    alert('Buku tidak ditemukan');
+                }
+            })
+            .catch((error) => {
+                console.error('Error getting book:', error);
+                alert('Terjadi kesalahan saat mengambil detail buku');
+            });
+    }
+
+    // Fungsi saveBook yang mengumpulkan data dari form dan memanggil saveBookToFirebase
+    function saveBook() {
+        const barcode = document.getElementById('barcode').value.trim();
+        const title = document.getElementById('book-title').value.trim();
+        const author = document.getElementById('book-author').value.trim();
+        const year = document.getElementById('book-year').value;
+        const owner = document.getElementById('book-owner').value;
+        const location = document.getElementById('input-location').value;
+        const description = document.getElementById('book-description').value;
+        const inputDate = document.getElementById('input-date').value;
+
+        if (!barcode) {
+            alert('Kode barcode tidak boleh kosong');
+            return;
+        }
+        if (!title) {
+            alert('Judul buku wajib diisi');
+            return;
+        }
+
+        // Validasi ISBN opsional
+        if (!validateISBN(barcode)) {
+            // Beri pilihan apakah tetap ingin menyimpan
+            if (!confirm('Barcode/ISBN tampak tidak valid. Tetap simpan?')) {
+                return;
+            }
+        }
+
+        const bookData = {
+            barcode,
+            title,
+            author: author || '',
+            year: year || '',
+            owner: owner || '',
+            location: location || '',
+            description: description || '',
+            inputDate: inputDate || '',
+            // Gunakan serverTimestamp agar konsisten
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Simpan ke Firestore
+        saveBookToFirebase(bookData);
+    }
+
+    // ... kode lain tetap ...
+                                                </script>
